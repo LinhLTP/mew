@@ -183,4 +183,36 @@ summary <- df_h5 %>%                                        # group and summaris
   group_by(h5, `annual income (£)`) %>%
   summarise(count = n(), .groups = "drop")
 
+# Label missing data
+## Data preparation
+names(which(colSums(is.na(df)) > 0))                       # List cols having NA 
+df[cols] <- lapply(df[cols], as.factor)                    # Convert data from numeric to factor
+sapply(df[cols], class)
+df <- haven::as_factor(df)
 
+## Data label
+### Label missing value by 'No answer'
+df <- df %>% mutate(across(where(is.factor), ~fct_na_value_to_level(.,'No answer')))
+
+df <- df %>% 
+  mutate(region_fb    = fct_recode(region_fb, 'Not applicable'    = 'No answer'),
+         age_fb       = fct_recode(age_fb, 'Not applicable'       = 'No answer'),
+         distribution = fct_recode(distribution, 'Not applicable' = 'No answer'),
+         adset        = fct_recode(adset, 'Not applicable'        = 'No answer')
+  )
+
+names(which(colSums(is.na(df)) > 0)).                     # check missing data 
+
+df <- df %>% mutate(across(c(b1a_1:b2_12, e5_1:e6_5), 
+                           ~case_when(. == 0           ~ "Not marked",
+                                      . == "No answer" ~ "No answer",    # .default = 
+                                      TRUE             ~ "Marked")))
+lapply(df[cols], data_tabulate)
+Export data
+
+df <- haven::as_factor(df) 
+class(df)
+
+df %>% sjPlot::view_df()
+
+write_sav(df, "Annonymised data.sav")
