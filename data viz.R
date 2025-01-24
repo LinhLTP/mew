@@ -41,7 +41,6 @@ ggplot(valid_questions, aes(x=Question_num)) +
         legend.title = element_text(size= 9)) +
   theme_classic()
 
-
 ggplot(valid_questions, aes(x=Question_num)) +
   geom_bar(aes(fill=Answer), position = "fill") +
   geom_text(
@@ -62,7 +61,6 @@ ggplot(valid_questions, aes(x=Question_num)) +
   theme(legend.text  = element_text(size= 8.5),
         legend.title = element_text(size= 9)) +
   coord_flip()
-
 
 ## in case we don’t want to showcase the answer No answer:
 valid_questions_filtered <- valid_questions %>%
