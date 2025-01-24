@@ -87,3 +87,57 @@ df <- df %>% select(-c(a3)) %>% rename('a3' = 'a3_1')
 data_tabulate(df$a3)                               # frequency of a3
 
 
+# Calculation 
+df_h5 <- haven::as_factor(df_h5) 
+
+## S1: combine three income values into one value of annual_income 
+df_h5 <- df_h5 %>% 
+  unite(
+    col = 'annual_income',
+    c('h5a', 'h5b', 'h5c'),
+    sep = " ",
+    remove = FALSE,
+    na.rm = TRUE
+  )
+
+## S2: Average weekly income
+df_h5 <- df_h5 %>% 
+  separate(h5a, into = c("w_from", "w_to"), sep = "-", extra = "merge") # remove string, text 
+
+df_h5 <- df_h5 %>%
+  mutate(
+    w_from = as.numeric(gsub(",|and more", "", as.character(w_from))),
+    w_to = as.numeric(gsub(",", "", as.character(w_to)))
+  )
+
+
+df_h5 <- df_h5 %>%                                                 # calculation annual income from weekly income 
+  mutate(
+    w_from_annual = (df_h5$w_from * 52), .after = w_to) %>%        # 52 week per year    
+  mutate(
+    w_to_annual = (df_h5$w_to * 52), .after = w_from_annual) 
+  %>% mutate(
+    w_from_annual = as.character(w_from_annual),
+    w_to_annual = as.character(w_to_annual)
+  )
+
+
+df_h5 <- df_h5 %>%                                                 # Unite annual income columns into a single range
+  unite(
+    col = 'annual_income (w)',
+    c('w_from_annual', 'w_to_annual'),
+    sep = '-',
+    remove = TRUE,
+    na.rm = FALSE
+  )
+
+
+df_h5 <- df_h5 %>%                                                # Clean up and handle special cases in "annual_income (w)" 
+  mutate(
+    `annual_income (w)` = gsub("NA-NA", "", `annual_income (w)`),
+    `annual_income (w)` = str_replace(`annual_income (w)`, "54236-NA", "54236 and more")
+  ) %>%
+  select(-w_from, -w_to)                                         # Remove intermediate columns
+
+df_h5
+
