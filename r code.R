@@ -30,21 +30,21 @@ pacman::p_load(
 )
 
 # Data Import
-# Display SPSS variable view and clean column names
-sjPlot::view_df(mydata)  # View variable metadata
+
+sjPlot::view_df(mydata)  
 df <- mydata %>% janitor::clean_names()
 
 
 # Data Anonymous
 
-## Step 1: Convert SPSS data to factors with value labels
+## Convert SPSS data to factors with value labels
 df[cols] <- lapply(df[cols], haven::as_factor).       # without the comma is a *list* subset
 sapply(df[cols], class)                               # check the class
 
 df2 <- df
 df2[, cols] <- lapply(df2[, cols], haven::as_factor)  # with the comma is a *matrix* subset 
 
-## Step 2: Threshold - convert factors to numeric values
+## Create Threshold - convert factors to numeric values
 df[cols] <- lapply(df[cols], function(x) as.numeric(levels(x)[x]))
 sapply(df[cols], class)
 
@@ -71,7 +71,7 @@ for (i in seq_along(threshold)) {
 }
 out
 
-## Step 3: Anonymise data
+## Anonymise data
 df <- df %>%   
   mutate(
     a3_1 = case_when(
@@ -87,21 +87,11 @@ df <- df %>% select(-c(a3)) %>% rename('a3' = 'a3_1')
 data_tabulate(df$a3)                               # frequency of a3
 
 
-# Calculation 
+# Calculation annual income by avg weekly income, avg monthly income 
 df_h5 <- haven::as_factor(df_h5) 
 
-## S1: combine three income values into one value of annual_income 
-df_h5 <- df_h5 %>% 
-  unite(
-    col = 'annual_income',
-    c('h5a', 'h5b', 'h5c'),
-    sep = " ",
-    remove = FALSE,
-    na.rm = TRUE
-  )
-
-## S2: Average weekly income
-df_h5 <- df_h5 %>% 
+## avg weekly income 
+df_h5 <- df_h5 %>%                                
   separate(h5a, into = c("w_from", "w_to"), sep = "-", extra = "merge") # remove string, text 
 
 df_h5 <- df_h5 %>%
@@ -109,7 +99,6 @@ df_h5 <- df_h5 %>%
     w_from = as.numeric(gsub(",|and more", "", as.character(w_from))),
     w_to = as.numeric(gsub(",", "", as.character(w_to)))
   )
-
 
 df_h5 <- df_h5 %>%                                                 # calculation annual income from weekly income 
   mutate(
@@ -121,7 +110,6 @@ df_h5 <- df_h5 %>%                                                 # calculation
     w_to_annual = as.character(w_to_annual)
   )
 
-
 df_h5 <- df_h5 %>%                                                 # Unite annual income columns into a single range
   unite(
     col = 'annual_income (w)',
@@ -131,7 +119,6 @@ df_h5 <- df_h5 %>%                                                 # Unite annua
     na.rm = FALSE
   )
 
-
 df_h5 <- df_h5 %>%                                                # Clean up and handle special cases in "annual_income (w)" 
   mutate(
     `annual_income (w)` = gsub("NA-NA", "", `annual_income (w)`),
@@ -140,4 +127,60 @@ df_h5 <- df_h5 %>%                                                # Clean up and
   select(-w_from, -w_to)                                         # Remove intermediate columns
 
 df_h5
+
+## avg monthly income
+df_h5 <- df_h5 %>%
+  mutate(
+    m_from_annual = m_from * 12, .after = m_to 
+    m_to_annual = m_to * 12, .after = m_from_annual 
+  ) %>%
+  mutate(
+    m_from_annual = as.character(m_from_annual),
+    m_to_annual = as.character(m_to_annual)
+  )
+
+df_h5 <- df_h5 %>%                                              # Unite one column 
+  unite(
+    col = "annual_income (m)",
+    c("m_from_annual", "m_to_annual"),
+    sep = "-",
+    remove = TRUE,
+    na.rm = FALSE
+  ) %>%
+  mutate(
+    `annual_income (m)` = gsub("NA-NA", "", `annual_income (m)`),
+    `annual_income (m)` = str_replace(`annual_income (m)`, "55596-NA", "55596 and more")
+  ) %>%
+  select(-m_from, -m_to)                                       # Remove intermediate columns
+
+df_h5 <- df_h5 %>%
+  mutate(h5c = as.character(h5c))
+
+df_h5 <- df_h5 %>%                                             # Unite weekly/ monthly/ h5c into 1 columns 
+  unite(
+    col = "annual income (£)",
+    c("annual_income (w)", "annual_income (m)", "h5c"),
+    sep = " ",
+    remove = TRUE,
+    na.rm = FALSE
+  ) %>%
+  mutate(
+    `annual income (£)` = gsub("NA", "", `annual income (£)`),
+    `annual income (£)` = gsub(",", "", `annual income (£)`),
+    `annual income (£)` = str_trim(`annual income (£)`, side = "both")
+  )
+
+df_h5 <- df_h5 %>%                                            # reorder & summarise earnings 
+  mutate(
+    earnings = fct_relevel(`annual income (£)`), .after = `annual income (£)`
+  ) %>%
+  tabyl(earnings)                                            # tabulate the frequency of each earning level
+
+df_h5 <- df_h5 %>%
+  select(h5, `annual income (£)`)
+
+summary <- df_h5 %>%                                        # group and summarise data by income levels
+  group_by(h5, `annual income (£)`) %>%
+  summarise(count = n(), .groups = "drop")
+
 
